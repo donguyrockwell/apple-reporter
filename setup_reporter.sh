@@ -480,13 +480,14 @@ main() {
     fn_configure_properties
     fn_get_vendor_ids
     fn_create_scripts
+    fn_create_manual_script
 
-    fn_log_info "=================================================="
-    fn_log_info "모든 설치 및 설정이 완료되었습니다."
-    fn_log_warn "중요: 생성된 $BIN_DIR/download_financial.sh 파일을 열어"
-    fn_log_warn "'ADMIN_EMAIL' 변수를 실제 관리자 이메일로 수정하십시오."
-    fn_log_info "이후 'crontab -e'를 사용하여 자동 실행을 예약하세요."
-    fn_log_info "=================================================="
+    fn_log_info "=========================================="
+    fn_log_info "설치 완료."
+    fn_log_info "1. 자동 실행: $BIN_DIR/download_financial.sh (Crontab 등록용)"
+    fn_log_info "2. 수동 실행: $BIN_DIR/download_financial_manual.sh (직접 실행용)"
+    fn_log_warn "주의: 생성된 스크립트 내 'ADMIN_EMAIL'을 수정해주세요."
+    fn_log_info "=========================================="
 }
 
 main
