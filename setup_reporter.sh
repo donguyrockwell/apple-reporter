@@ -361,6 +361,98 @@ EOF
     fn_log_info "스크립트 생성 완료: $BIN_DIR/download_financial.sh"
 }
 
+# --- 9. (신규 추가) 수동 다운로드 스크립트 생성 ---
+fn_create_manual_script() {
+    fn_log_info "수동 다운로드 스크립트(download_financial_manual.sh)를 생성합니다..."
+    
+    # 스크립트 내용 작성
+    sudo tee "$BIN_DIR/download_financial_manual.sh" > /dev/null << 'EOF'
+#!/bin/bash
+#
+# download_financial_manual.sh
+# 기능: 날짜(YYYY-MM)를 직접 입력받아 해당 월의 재무 보고서를 다운로드합니다.
+#
+
+BASE_DIR="/opt/apple_reporter/bin"
+JAR_FILE="Reporter.jar"
+PROP_FILE="Reporter.properties"
+DOWNLOAD_DIR="/opt/apple_reporter/reports/financial"
+VENDOR_CONF="/opt/apple_reporter/bin/vendor.conf"
+
+# 벤더 설정 로드
+if [ ! -f "$VENDOR_CONF" ]; then
+    echo "[오류] 벤더 설정 파일($VENDOR_CONF)이 없습니다."
+    exit 1
+fi
+source "$VENDOR_CONF"
+
+# --- 사용자 입력 받기 ---
+echo "============================================="
+echo "   Apple Financial Report Manual Download    "
+echo "============================================="
+read -p ">> 다운로드할 연월을 입력하세요 (예: 2024-05): " TARGET_DATE
+
+# 입력 형식 검증 (정규식: 숫자4개-숫자2개)
+if [[ ! "$TARGET_DATE" =~ ^[0-9]{4}-[0-9]{2}$ ]]; then
+    echo "[오류] 날짜 형식이 올바르지 않습니다. YYYY-MM 형식으로 입력해주세요."
+    exit 1
+fi
+
+# 연도와 월 분리
+G_YEAR=$(echo "$TARGET_DATE" | cut -d'-' -f1)
+G_MONTH=$(echo "$TARGET_DATE" | cut -d'-' -f2)
+# 문자열을 숫자로 변환 (10진수 강제 지정, 08/09 입력 시 8진수 오류 방지)
+G_MONTH=$((10#$G_MONTH))
+
+# --- Apple 회계 기준 변환 로직 ---
+# Apple 회계연도는 전년도 10월부터 시작됩니다.
+# (예: 2023년 10월 -> 2024 회계연도 1기)
+if [ $G_MONTH -ge 10 ]; then
+    FISCAL_YEAR=$((G_YEAR + 1))
+    FISCAL_PERIOD=$((G_MONTH - 9))
+else
+    FISCAL_YEAR=$G_YEAR
+    FISCAL_PERIOD=$((G_MONTH + 3))
+fi
+
+echo "---------------------------------------------"
+echo " 입력 날짜 : $G_YEAR 년 $G_MONTH 월"
+echo " 변환 결과 : $FISCAL_YEAR 회계연도 / $FISCAL_PERIOD 기(Period)"
+echo "---------------------------------------------"
+
+# 실행 디렉터리 이동
+cd "$BASE_DIR" || { echo "오류: $BASE_DIR 이동 실패"; exit 1; }
+REGION="ZZ"
+TYPE="Financial"
+
+# 벤더별 다운로드 실행
+for VENDOR in $VENDORS; do
+    echo ">> [Vendor: $VENDOR] 다운로드 시도 중..."
+    
+    FILENAME="${VENDOR}_${REGION}_${TYPE}_${FISCAL_YEAR}_${FISCAL_PERIOD}.gz"
+    PARAMS="$VENDOR,$REGION,$TYPE,$FISCAL_YEAR,$FISCAL_PERIOD"
+
+    # Java 명령어 실행
+    CAPTURE=$(java -jar "$JAR_FILE" "p=$PROP_FILE" Finance.getReport "$PARAMS" 2>&1)
+    
+    # 결과 확인 (파일이 생성되었는지 확인)
+    if [ -f "./$FILENAME" ]; then
+        mv "./$FILENAME" "$DOWNLOAD_DIR/"
+        echo "   [성공] 다운로드 완료: $DOWNLOAD_DIR/$FILENAME"
+    else
+        echo "   [실패 또는 없음] 메시지: $CAPTURE"
+    fi
+    echo ""
+done
+
+echo "작업이 완료되었습니다."
+EOF
+
+    # 실행 권한 부여
+    sudo chmod +x "$BIN_DIR/download_financial_manual.sh"
+    fn_log_info "수동 스크립트 생성 완료: $BIN_DIR/download_financial_manual.sh"
+}
+
 # --- 메인 실행 함수 ---
 main() {
     fn_log_info "====== Apple Reporter 설치 스크립트 시작 ======"
